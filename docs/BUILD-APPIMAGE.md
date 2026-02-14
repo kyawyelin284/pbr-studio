@@ -74,13 +74,13 @@ npm run tauri build -- --bundles appimage --ci
 
 ### Option C: GitHub Actions
 
-- **Tag-based release**: Push a version tag (e.g. `v0.1.0`) to trigger cross-platform builds (Linux AppImage, Windows MSI, macOS DMG). See [`.github/workflows/ci-release.yml`](../.github/workflows/ci-release.yml).
+- **Tag-based release**: Push a version tag (e.g. `v1.0.0`) to trigger cross-platform builds (Linux AppImage, Windows MSI, macOS DMG). See [`.github/workflows/ci-release.yml`](../.github/workflows/ci-release.yml).
 
 ## Running the AppImage
 
 ```bash
-chmod +x pbr-studio-ui_0.1.0_amd64.AppImage
-./pbr-studio-ui_0.1.0_amd64.AppImage
+chmod +x pbr-studio-ui_1.0.0_amd64.AppImage
+./pbr-studio-ui_1.0.0_amd64.AppImage
 ```
 
 Or double-click it in a file manager (ensure it has execute permission).
@@ -90,3 +90,62 @@ Or double-click it in a file manager (ensure it has execute permission).
 - **glibc compatibility**: Build on the oldest Linux you want to support. A binary built on Ubuntu 22.04 may fail on older systems with errors like `GLIBC_2.33 not found`. Use Ubuntu 20.04 or a Docker container for broader compatibility.
 - **Size**: AppImage bundles are typically 70+ MB due to bundled libraries.
 - **FUSE**: Running AppImage requires `libfuse2`. Some newer systems ship only `libfuse3`; install `libfuse2` if needed.
+
+---
+
+## Validating minimum glibc version
+
+The AppImage built by CI uses **Ubuntu 22.04**, which provides **glibc 2.35**. The binary therefore requires **glibc 2.35 or newer** on the target system.
+
+### Check system glibc version
+
+On the target Linux system:
+
+```bash
+ldd --version
+```
+
+Example output: `ldd (Ubuntu GLIBC 2.35-0ubuntu3.1) 2.35` → minimum is 2.35.
+
+### Check minimum glibc required by the AppImage
+
+To validate which glibc versions the built AppImage requires:
+
+1. **Extract the AppImage** (creates `squashfs-root/`):
+
+   ```bash
+   ./pbr-studio-ui_1.0.0_amd64.AppImage --appimage-extract
+   ```
+
+2. **Find the main binary** (Tauri app executable under `squashfs-root/`):
+
+   ```bash
+   find squashfs-root -type f -executable ! -name "*.so*" | head -5
+   ```
+
+3. **List required glibc versions** (replace `BINARY_PATH` with the path from step 2):
+
+   ```bash
+   objdump -T BINARY_PATH | grep GLIBC | \
+     sed 's/.*GLIBC_\([.0-9]*\).*/\1/' | sort -Vu
+   ```
+
+   The **highest version** in the output is the minimum glibc required.
+
+### glibc by distribution
+
+| Distribution | glibc | Compatible with Ubuntu 22.04 build? |
+|--------------|-------|-------------------------------------|
+| Ubuntu 24.04 | 2.39  | Yes                                 |
+| Ubuntu 22.04 | 2.35  | Yes                                 |
+| Ubuntu 20.04 | 2.31  | No (upgrade glibc or rebuild)       |
+| Debian 11    | 2.31  | No                                  |
+| Debian 12    | 2.36  | Yes                                 |
+| Fedora 36+   | 2.35+ | Yes                                 |
+
+### Building for broader compatibility
+
+To support Ubuntu 20.04 / Debian 11 (glibc 2.31+), build on an older base:
+
+- Use **Ubuntu 20.04** in CI: change `runs-on: ubuntu-22.04` to `ubuntu-20.04` for the AppImage job.
+- Or use a Docker image: `docker run -v $(pwd):/app -w /app ubuntu:20.04 ./scripts/build-appimage.sh`

@@ -108,6 +108,9 @@ interface Viewport3DProps {
   labelB?: string;
   /** Increment to force texture reload (e.g. when files change) */
   refreshKey?: number;
+  /** When true, show "Clear preview" to exit tileability before/after view */
+  tileabilityPreviewActive?: boolean;
+  onClearTileabilityPreview?: () => void;
 }
 
 function SingleViewport({
@@ -145,6 +148,8 @@ export function Viewport3D({
   labelA = 'A',
   labelB = 'B',
   refreshKey = 0,
+  tileabilityPreviewActive = false,
+  onClearTileabilityPreview,
 }: Viewport3DProps) {
   const showCompare = compareMode && textureUrlsB != null;
 
@@ -152,7 +157,18 @@ export function Viewport3D({
     <div className="panel panel-center">
       <div className="panel-header viewport-header">
         <span>{showCompare ? 'Material Comparison' : '3D Preview'}</span>
-        <div className="hdri-selector">
+        <div className="viewport-header-actions">
+          {tileabilityPreviewActive && onClearTileabilityPreview && (
+            <button
+              type="button"
+              className="btn-clear-preview"
+              onClick={onClearTileabilityPreview}
+              title="Clear before/after preview"
+            >
+              Clear preview
+            </button>
+          )}
+          <div className="hdri-selector">
           <label htmlFor="hdri-preset">HDRI: </label>
           <select
             id="hdri-preset"
@@ -165,6 +181,7 @@ export function Viewport3D({
               </option>
             ))}
           </select>
+          </div>
         </div>
       </div>
       <div className={`viewport ${showCompare ? 'viewport-compare' : ''}`}>

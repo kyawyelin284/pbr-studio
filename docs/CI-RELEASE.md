@@ -2,6 +2,8 @@
 
 The `.github/workflows/ci-release.yml` workflow runs on tag pushes (`v*`) and manual dispatch.
 
+**Pre-release**: Use [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md) before tagging a version.
+
 ## Jobs
 
 ### 1. CLI batch check

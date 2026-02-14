@@ -27,6 +27,7 @@ interface TexturePanelProps {
   onRefresh?: () => void;
   dragOver?: boolean;
   onExportPreset?: (preset: ExportPresetId, includeLod?: boolean) => void;
+  onBatchExportPreset?: (preset: ExportPresetId, includeLod?: boolean) => void;
   exportLoading?: boolean;
   materials?: { path: string; name: string; score: number | null; loading?: boolean }[];
   selectedIndex?: number | null;
@@ -60,6 +61,7 @@ export function TexturePanel({
   onAnalyze,
   onRefresh,
   onExportPreset,
+  onBatchExportPreset,
   exportLoading = false,
   materials = [],
   selectedIndex = null,
@@ -166,17 +168,19 @@ export function TexturePanel({
               onChange={(e) => onFolderSelect?.([e.target.value])}
               placeholder="Select folder(s)..."
             />
-            <button onClick={handleOpenFolder}>Browse</button>
+            <button onClick={handleOpenFolder} title="Select one or more material folders">
+            Add folders
+          </button>
           </div>
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
           <button
-            onClick={onAnalyze}
-            disabled={!folderPath}
+            onClick={materials.length === 0 ? handleOpenFolder : () => onAnalyze?.()}
             style={{ flex: 1 }}
+            title={materials.length > 0 ? 'Re-analyze selected or all materials' : 'Open folder picker to add materials'}
           >
-            {materials.length > 0 ? 'Re-analyze Selected' : 'Analyze Material'}
+            {materials.length > 0 ? 'Re-analyze' : 'Add folders'}
           </button>
           {onRefresh && folderPath && (
             <button
@@ -190,7 +194,7 @@ export function TexturePanel({
           )}
         </div>
 
-        {isTauri && onExportPreset && (
+        {isTauri && (onExportPreset || onBatchExportPreset) && (
           <div className="export-presets" style={{ marginTop: 24 }}>
             <span className="texture-slot-label" style={{ marginBottom: 10, display: 'block' }}>
               Export Presets
@@ -207,21 +211,42 @@ export function TexturePanel({
               {exportPresets.map(({ id, label }) => (
                 <button
                   key={id}
-                  onClick={() => onExportPreset(id, includeLod)}
+                  onClick={() => onExportPreset?.(id, includeLod)}
                   disabled={!folderPath || exportLoading}
                   className="export-preset-btn"
+                  title="Export selected material"
                 >
                   {label}
                 </button>
               ))}
             </div>
+            {onBatchExportPreset && materials.length > 0 && (
+              <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border-color)' }}>
+                <span className="texture-slot-label" style={{ marginBottom: 8, display: 'block', fontSize: '0.8rem' }}>
+                  Batch export ({materials.length} materials)
+                </span>
+                <div className="export-preset-buttons">
+                  {exportPresets.map(({ id, label }) => (
+                    <button
+                      key={`batch-${id}`}
+                      onClick={() => onBatchExportPreset(id, includeLod)}
+                      disabled={exportLoading}
+                      className="export-preset-btn"
+                      title={`Export all materials as ${label}`}
+                    >
+                      Batch {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         <div style={{ marginTop: 24 }}>
           {isTauri && (
           <p className="texture-slot-hint" style={{ marginTop: 8, marginBottom: 16 }}>
-            Tip: Drag multiple folders or a root folder (recursive scan). Use Browse to select several folders at once.
+            Tip: Drag multiple folders or a root folder (recursive scan). Use Add folders to select several material folders at once. All operations are local and offline.
           </p>
         )}
         <span className="texture-slot-label" style={{ marginBottom: 12, display: 'block' }}>

@@ -18,7 +18,7 @@ A fully offline, open-source PBR texture set analyzer and exporter. Optimized fo
 
 | Crate        | Purpose                                                                 |
 |-------------|-------------------------------------------------------------------------|
-| **pbr-core**   | Image I/O (PNG, JPG, TGA; EXR planned), material analysis, validation rules, report, optimization |
+| **pbr-core**   | Image I/O (PNG, JPG, TGA, EXR), material analysis, validation rules, report, optimization |
 | **pbr-cli**    | Command-line tools for CI and batch processing                         |
 | **pbr-studio-ui** | Tauri desktop app with Blender-style layout                         |
 
@@ -39,7 +39,7 @@ cargo build -p pbr-cli --release
 | `optimize <folder> --output <path> --target <preset>` | Export optimized textures; `--lod` for LOD chain |
 | `batch-optimize <root> --output <path> --target <preset>` | Batch export all materials under root |
 | `report <folder> --json` | Generate text or JSON report; `--vram` for VRAM estimate |
-| `export-report <folders> --format html\|pdf --output <path>` | Export HTML or PDF reports |
+| `export-report <folders> --format html\|pdf\|json --output <path>` | Export HTML, PDF, or batch JSON reports |
 | `analyze <root>` | Advanced analysis (duplicates, cross-material, tileability) |
 | `fix-tileability <path> --output <path>` | Apply tileability fix to texture |
 | `audit-log [--limit N] [--json] [-o FILE] [--format json\|text]` | Show or export audit log |
@@ -48,7 +48,7 @@ cargo build -p pbr-cli --release
 
 The CLI exits with code 1 if any material score is below the configured `--min-score` threshold.
 
-**Full CLI reference:** [docs/CLI-USAGE.md](docs/CLI-USAGE.md)
+**CLI quickstart:** [docs/CLI-QUICKSTART.md](docs/CLI-QUICKSTART.md) · **Full reference:** [docs/CLI-USAGE.md](docs/CLI-USAGE.md)
 
 ### Examples
 
@@ -79,6 +79,11 @@ pbr-cli report ./Materials/Wood --vram
 
 # JSON report
 pbr-cli report ./Materials/Wood --json
+
+# Batch export reports (HTML, PDF, or JSON; local output only)
+pbr-cli export-report ./Mat1 ./Mat2 --format html --output batch-report.html
+pbr-cli export-report ./Mat1 ./Mat2 --format pdf --output batch-report.pdf
+pbr-cli export-report ./Mat1 ./Mat2 --format json --output batch-report.json
 
 # CI/CD: structured JSON for pipelines
 pbr-cli check ./Materials/Wood --ci --min-score 60
@@ -165,7 +170,7 @@ Use `--ci` to output structured JSON for automated pipelines:
 
 Blender-style layout: left (materials), center (3D viewport), right (validation), bottom (console/audit log).
 
-**UI guide:** [docs/UI-GUIDE.md](docs/UI-GUIDE.md)
+**Desktop UI guide:** [docs/UI-GUIDE.md](docs/UI-GUIDE.md)
 
 ### Development
 
@@ -188,7 +193,7 @@ npm run tauri:build
 
 ```bash
 ./scripts/build-appimage.sh
-# Output: target/release/bundle/appimage/*.AppImage
+# Output: pbr-studio-ui/src-tauri/target/release/bundle/appimage/*.AppImage
 ```
 
 See [docs/BUILD-APPIMAGE.md](docs/BUILD-APPIMAGE.md) for dependencies (WebKit, librsvg, etc.).
@@ -215,22 +220,36 @@ See [docs/BUILD-WINDOWS.md](docs/BUILD-WINDOWS.md) for Visual Studio/WebView2.
 
 All builds run **offline**—no network during analysis, validation, or export. Audit logs, plugins, and reports use local paths only.
 
-## Release builds (GitHub Actions)
+## Known limitations
 
-Push a version tag to trigger cross-platform builds:
+- **macOS DMG** – Unsigned; Gatekeeper may show a warning. Right-click → Open to run, or see [BUILD-MACOS.md](docs/BUILD-MACOS.md) for code signing.
+- **Linux AppImage** – Built on Ubuntu 22.04; requires **glibc 2.35+**. Older distros (e.g. Ubuntu 20.04) may need a rebuild. See [BUILD-APPIMAGE.md](docs/BUILD-APPIMAGE.md#validating-minimum-glibc-version).
+
+## Release Process
+
+The [`.github/workflows/ci-release.yml`](.github/workflows/ci-release.yml) workflow builds cross-platform artifacts on tag push.
+
+### 1. Tag and push
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v1.0.0
+git push origin v1.0.0
 ```
 
-This builds:
+### 2. What runs
 
-- Linux: AppImage (x64)
-- Windows: MSI (x64)
-- macOS: DMG (x64 and Apple Silicon)
+- **CLI batch check** – Validates fixtures, outputs CI JSON
+- **Report generation** – HTML and PDF from fixtures
+- **Cross-platform builds** – Linux AppImage, Windows MSI, macOS DMG (x64 + Apple Silicon)
+- **GitHub Release** – Draft release with all artifacts attached
 
-Artifacts are uploaded to a draft GitHub release. See [.github/workflows/ci-release.yml](.github/workflows/ci-release.yml).
+### 3. After the run
+
+1. Open **Releases** → find the draft for your tag
+2. Add release notes and publish
+3. Download artifacts or use the published installer links
+
+See [docs/CI-RELEASE.md](docs/CI-RELEASE.md) for details and optional artifact storage.
 
 ## Documentation
 
@@ -239,14 +258,21 @@ Artifacts are uploaded to a draft GitHub release. See [.github/workflows/ci-rele
 | [CLI-USAGE.md](docs/CLI-USAGE.md) | Full CLI reference with examples |
 | [UI-GUIDE.md](docs/UI-GUIDE.md) | Desktop app usage |
 | [FEATURES.md](docs/FEATURES.md) | Batch analysis, plugins, AI, optimization presets |
-| [plugins/README.md](docs/plugins/README.md) | Plugin system (rules, presets) |
-| [ai-module.md](docs/ai-module.md) | AI classification, suggestions, anomaly detection |
-| [examples/](docs/examples/) | Sample JSON/HTML report outputs |
+| [CI-RELEASE.md](docs/CI-RELEASE.md) | Release workflow and GitHub Actions |
+| [RELEASE-CHECKLIST.md](docs/RELEASE-CHECKLIST.md) | Pre-release verification and hardening steps |
+| [BUILD-APPIMAGE.md](docs/BUILD-APPIMAGE.md) | Linux AppImage build, glibc validation |
+| [BUILD-MACOS.md](docs/BUILD-MACOS.md) | macOS DMG build, Gatekeeper code signing |
+| [BUILD-WINDOWS.md](docs/BUILD-WINDOWS.md) | Windows MSI build |
 | [BUILD-TESTING.md](docs/BUILD-TESTING.md) | Build verification, platform prerequisites |
+| [CLI-QUICKSTART.md](docs/CLI-QUICKSTART.md) | CLI quickstart and common workflows |
+| [plugins/README.md](docs/plugins/README.md) | Plugin development guide (rules, presets) |
+| [ai-module.md](docs/ai-module.md) | AI heuristics module (classification, suggestions) |
+| [examples/](docs/examples/) | Sample JSON/HTML report outputs |
+| [RELEASE-NOTES-v1.0.0.md](docs/RELEASE-NOTES-v1.0.0.md) | v1.0.0 release notes (paste into GitHub Release) |
 
 ## Supported formats
 
-- **Input**: PNG, JPG, TGA (EXR support planned)
+- **Input**: PNG, JPG, TGA, EXR (OpenEXR)
 - **Output**: PNG, JPG, TGA
 - **Channel packing**: R=AO, G=Roughness, B=Metallic (ORM/RMA texture)
 

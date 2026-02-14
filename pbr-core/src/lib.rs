@@ -28,7 +28,7 @@ pub mod undo_stack;
 pub mod version_tracker;
 
 // Re-export main types for convenient access
-pub use image_loading::{ImageLoader, LoadedImage, TextureSlot};
+pub use image_loading::{ExrValidationReport, ImageLoader, LoadedImage, TextureSlot};
 pub use json_report::{MaterialReport, OptimizationSuggestion, ReportIssue};
 pub use report_export::{export_html_batch, export_html_single, export_pdf_batch, export_pdf_single};
 pub use version_tracker::{record_analysis, load_version_log, VersionEntry, VersionLog};

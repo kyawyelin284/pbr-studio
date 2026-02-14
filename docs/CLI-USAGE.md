@@ -25,7 +25,7 @@ pbr-cli report ./Materials/Wood --json
 | `optimize` | Export optimized textures for target engine |
 | `batch-optimize` | Batch export all materials under root |
 | `report` | Generate text or JSON report |
-| `export-report` | Export HTML or PDF reports |
+| `export-report` | Export HTML, PDF, or batch JSON reports |
 | `analyze` | Advanced analysis (duplicates, cross-material, tileability) |
 | `fix-tileability` | Apply edge blending for seamless tiling |
 | `audit-log` | Show validation/optimization/report history |
@@ -140,12 +140,17 @@ pbr-cli report ./Materials/Wood --export pdf --output report.pdf
 
 ### Batch report export
 
+Output paths are local-only (no network). Formats: `html`, `pdf`, or `json`.
+
 ```bash
 # HTML report for multiple materials
 pbr-cli export-report ./Mat1 ./Mat2 ./Mat3 --format html --output batch-report.html
 
 # PDF report
 pbr-cli export-report ./Materials/* --format pdf --output report.pdf
+
+# Batch JSON (matches report <folder> --json schema; array of { path, report })
+pbr-cli export-report ./Mat1 ./Mat2 --format json --output batch-report.json
 
 # Track versions in .pbr-studio/versions.json
 pbr-cli export-report ./Materials --format html --output report.html --track

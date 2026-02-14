@@ -1,7 +1,8 @@
 //! Image loading and texture metadata.
 //!
-//! Loads PNG, JPG, and TGA files and returns width, height, and RGBA color data.
+//! Loads PNG, JPG, TGA, and EXR files and returns width, height, and RGBA color data.
 //! Supports common PBR map names for automatic slot detection.
+//! EXR (OpenEXR) HDR values are tone-mapped to 8-bit for analysis.
 
 use crate::Result;
 use image::GenericImageView;
@@ -35,11 +36,12 @@ impl TextureSlot {
     }
 }
 
-/// Supported image formats for loading (PNG, JPG, TGA; EXR via separate loader)
+/// Supported image formats for loading (PNG, JPG, TGA, EXR)
 pub const SUPPORTED_FORMATS: &[ImageFormat] = &[
     ImageFormat::Png,
     ImageFormat::Jpeg,
     ImageFormat::Tga,
+    ImageFormat::OpenExr,
 ];
 
 /// A loaded texture image with pixel data
@@ -101,37 +103,92 @@ impl LoadedImage {
     }
 }
 
-/// Loads and parses PBR texture images (PNG, JPG, TGA)
+/// Result of validating EXR channel data after loading.
+#[derive(Debug, Clone, Default, serde::Serialize)]
+pub struct ExrValidationReport {
+    /// Whether the loaded data passed validation
+    pub valid: bool,
+    /// Number of channels (always 4 for RGBA output)
+    pub channel_count: u32,
+    /// Warnings (e.g. empty regions, unusual value range)
+    pub warnings: Vec<String>,
+}
+
+impl LoadedImage {
+    /// Validate EXR channel data. Call when format is OpenExr.
+    /// Checks dimensions, data length, and basic data integrity.
+    pub fn validate_exr_channels(&self) -> ExrValidationReport {
+        let mut report = ExrValidationReport {
+            valid: true,
+            channel_count: 4,
+            warnings: Vec::new(),
+        };
+
+        if self.width == 0 || self.height == 0 {
+            report.valid = false;
+            report.warnings.push("Invalid dimensions: width and height must be > 0".into());
+            return report;
+        }
+
+        let expected_len = (self.width as usize) * (self.height as usize) * 4;
+        if self.data.len() != expected_len {
+            report.valid = false;
+            report.warnings.push(format!(
+                "Data length mismatch: expected {} bytes, got {}",
+                expected_len,
+                self.data.len()
+            ));
+            return report;
+        }
+
+        // Check for all-zero (possibly failed/corrupt load)
+        if self.data.iter().all(|&b| b == 0) {
+            report.warnings.push("All pixels are zero - image may be empty or corrupt".into());
+        }
+
+        report
+    }
+}
+
+/// Loads and parses PBR texture images (PNG, JPG, TGA, EXR)
 pub struct ImageLoader;
 
 impl ImageLoader {
-    /// Load an image from a file path (PNG, JPG, TGA)
-    /// EXR: add optional `exr` crate for HDR support
+    /// Load an image from a file path (PNG, JPG, TGA, EXR)
+    /// EXR HDR values are tone-mapped to 8-bit RGBA for analysis.
+    /// For EXR, validates channel data and returns errors on failure.
     pub fn load<P: AsRef<Path>>(path: P) -> Result<LoadedImage> {
         let path = path.as_ref();
-        let ext = path
-            .extension()
-            .and_then(|e| e.to_str())
-            .map(|s| s.to_lowercase());
-
-        if ext.as_deref() == Some("exr") {
-            return Err(crate::Error::Other(
-                "EXR support planned. Use PNG, JPG, or TGA.".into(),
-            ));
-        }
-
         let reader = image::ImageReader::open(path)?;
-        let format = reader.format().unwrap_or(ImageFormat::Png);
+        let format = reader.format().unwrap_or_else(|| {
+            path.extension()
+                .and_then(|e| e.to_str())
+                .and_then(|s| ImageFormat::from_extension(s))
+                .unwrap_or(ImageFormat::Png)
+        });
 
         if !SUPPORTED_FORMATS.contains(&format) {
             return Err(crate::Error::Other(format!(
-                "Unsupported format: {:?}. Use PNG, JPG, or TGA.",
+                "Unsupported format: {:?}. Use PNG, JPG, TGA, or EXR.",
                 format
             )));
         }
 
         let image = reader.decode()?;
-        Ok(LoadedImage::from_dynamic(image, format))
+        let loaded = LoadedImage::from_dynamic(image, format);
+
+        // Validate EXR channel data when applicable
+        if format == ImageFormat::OpenExr {
+            let validation = loaded.validate_exr_channels();
+            if !validation.valid {
+                return Err(crate::Error::Other(format!(
+                    "EXR channel validation failed: {}",
+                    validation.warnings.join("; ")
+                )));
+            }
+        }
+
+        Ok(loaded)
     }
 
     /// Load from file and detect PBR slot from filename
@@ -189,6 +246,79 @@ mod tests {
         assert_eq!(loaded.data.len(), 3 * 2 * 4);
         assert_eq!(loaded.pixel(0, 0), Some([255, 0, 0, 255]));
         assert_eq!(loaded.pixel(1, 0), Some([0, 255, 0, 255]));
+    }
+
+    #[test]
+    fn load_exr_returns_width_height_and_data() {
+        let tmp = std::env::temp_dir().join("pbr_core_test.exr");
+        exr::image::write::write_rgba_file(
+            &tmp,
+            2,
+            2,
+            |x, y| {
+                let (r, g, b) = match (x, y) {
+                    (0, 0) => (1.0_f32, 0.0, 0.0),
+                    (1, 0) => (0.0, 1.0, 0.0),
+                    (0, 1) => (0.0, 0.0, 1.0),
+                    _ => (0.5, 0.5, 0.5),
+                };
+                (r, g, b, 1.0_f32)
+            },
+        )
+        .unwrap();
+
+        let loaded = ImageLoader::load(&tmp).unwrap();
+        std::fs::remove_file(&tmp).ok();
+
+        assert_eq!(loaded.width, 2);
+        assert_eq!(loaded.height, 2);
+        assert_eq!(loaded.data.len(), 2 * 2 * 4);
+        assert_eq!(loaded.format, ImageFormat::OpenExr);
+        // Tone-mapped: (1,0,0) -> red dominant, (0,1,0) -> green dominant
+        let p00 = loaded.pixel(0, 0).unwrap();
+        let p10 = loaded.pixel(1, 0).unwrap();
+        assert!(p00[0] > p00[1] && p00[0] > p00[2], "pixel (0,0) should be red");
+        assert!(p10[1] > p10[0] && p10[1] > p10[2], "pixel (1,0) should be green");
+    }
+
+    #[test]
+    fn validate_exr_channels_valid() {
+        let loaded = LoadedImage {
+            width: 4,
+            height: 4,
+            data: vec![128; 4 * 4 * 4],
+            format: ImageFormat::OpenExr,
+            color_type: "Rgba32F".into(),
+        };
+        let report = loaded.validate_exr_channels();
+        assert!(report.valid);
+        assert_eq!(report.channel_count, 4);
+    }
+
+    #[test]
+    fn validate_exr_channels_invalid_dimensions() {
+        let loaded = LoadedImage {
+            width: 0,
+            height: 4,
+            data: vec![],
+            format: ImageFormat::OpenExr,
+            color_type: "Rgba32F".into(),
+        };
+        let report = loaded.validate_exr_channels();
+        assert!(!report.valid);
+        assert!(!report.warnings.is_empty());
+    }
+
+    #[test]
+    fn detect_slot_albedo_exr() {
+        assert_eq!(
+            ImageLoader::detect_slot_from_path("material_albedo.exr"),
+            Some(TextureSlot::Albedo)
+        );
+        assert_eq!(
+            ImageLoader::detect_slot_from_path("roughness.exr"),
+            Some(TextureSlot::Roughness)
+        );
     }
 
     #[test]

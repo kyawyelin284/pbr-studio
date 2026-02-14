@@ -5,6 +5,8 @@ import {
   type LayoutPreset,
 } from '../context/PreferencesContext';
 
+const APP_VERSION = '1.0.0';
+
 interface SettingsPanelProps {
   open: boolean;
   onClose: () => void;
@@ -12,6 +14,7 @@ interface SettingsPanelProps {
 
 export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const { preferences, setTheme, setLayout, setValidationColors, setUndoHistorySize, setPluginsDir, resetToDefaults } = usePreferences();
+  const [appVersion, setAppVersion] = useState(APP_VERSION);
   const [localCritical, setLocalCritical] = useState(preferences.validationColors.critical);
   const [localWarning, setLocalWarning] = useState(preferences.validationColors.warning);
   const [localPass, setLocalPass] = useState(preferences.validationColors.pass);
@@ -21,6 +24,9 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
       setLocalCritical(preferences.validationColors.critical);
       setLocalWarning(preferences.validationColors.warning);
       setLocalPass(preferences.validationColors.pass);
+      if (typeof window !== 'undefined' && '__TAURI__' in window) {
+        import('@tauri-apps/api/app').then(({ getVersion }) => getVersion()).then(setAppVersion).catch(() => {});
+      }
     }
   }, [open, preferences.validationColors]);
 
@@ -202,6 +208,12 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                 Reset to defaults
               </button>
             </div>
+          </div>
+
+          <div className="settings-about">
+            <div className="settings-about-title">PBR Studio</div>
+            <div className="settings-about-version">v{appVersion}</div>
+            <div className="settings-storage-note">Offline PBR texture analyzer. All data stays local.</div>
           </div>
 
           <div className="settings-footer">

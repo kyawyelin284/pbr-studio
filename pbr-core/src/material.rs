@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 /// Supported image extensions for folder scanning
-const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "tga"];
+const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "tga", "exr"];
 
 /// A texture map with resolution and pixel data
 #[derive(Debug, Clone)]
@@ -444,5 +444,28 @@ mod tests {
         assert_eq!(albedo.width, 4);
         assert_eq!(albedo.height, 4);
         assert_eq!(albedo.data.len(), 4 * 4 * 4);
+    }
+
+    #[test]
+    fn load_from_folder_with_exr() {
+        let tmp = std::env::temp_dir().join("pbr_material_exr_test");
+        std::fs::create_dir_all(&tmp).unwrap();
+
+        exr::image::write::write_rgba_file(
+            tmp.join("albedo.exr"),
+            8,
+            8,
+            |_, _| (0.5_f32, 0.5, 0.5, 1.0),
+        )
+        .unwrap();
+
+        let set = MaterialSet::load_from_folder(&tmp).unwrap();
+
+        std::fs::remove_file(tmp.join("albedo.exr")).ok();
+        std::fs::remove_dir(&tmp).ok();
+
+        assert!(set.has_albedo());
+        assert_eq!(set.albedo.as_ref().unwrap().width, 8);
+        assert_eq!(set.albedo.as_ref().unwrap().height, 8);
     }
 }

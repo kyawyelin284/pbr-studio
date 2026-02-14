@@ -28,14 +28,10 @@ pub fn export_html_batch(
 #[cfg(feature = "pdf")]
 pub fn export_pdf_single(report: &MaterialReport, output_path: &Path) -> Result<(), crate::Error> {
     use genpdf::elements::Paragraph;
-    use genpdf::fonts::from_files;
     use genpdf::style;
     use genpdf::{Document, Margins, SimplePageDecorator};
 
-    let font_path = find_font_path()?;
-    let font_family = from_files(&font_path, "LiberationSans", None)
-        .map_err(|e| crate::Error::Other(format!("Font load failed: {}", e)))?;
-
+    let font_family = load_pdf_font()?;
     let mut doc = Document::new(font_family);
     doc.set_title(report.name.as_deref().unwrap_or("PBR Material Report"));
     doc.set_minimal_conformance();
@@ -82,14 +78,10 @@ pub fn export_pdf_batch(
     output_path: &Path,
 ) -> Result<(), crate::Error> {
     use genpdf::elements::Paragraph;
-    use genpdf::fonts::from_files;
     use genpdf::style;
     use genpdf::{Document, Margins, SimplePageDecorator};
 
-    let font_path = find_font_path()?;
-    let font_family = from_files(&font_path, "LiberationSans", None)
-        .map_err(|e| crate::Error::Other(format!("Font load failed: {}", e)))?;
-
+    let font_family = load_pdf_font()?;
     let mut doc = Document::new(font_family);
     doc.set_title("PBR Material Batch Report");
     doc.set_minimal_conformance();
@@ -134,28 +126,140 @@ pub fn export_pdf_batch(
     Ok(())
 }
 
+/// Bundled DejaVu Sans (SIL Open Font License). Used when system fonts are unavailable.
 #[cfg(feature = "pdf")]
-fn find_font_path() -> Result<std::path::PathBuf, crate::Error> {
-    let candidates = [
-        "/usr/share/fonts/truetype/liberation",
-        "/usr/share/fonts/TTF",
-        "/usr/share/fonts/truetype/dejavu",
-        "/usr/local/share/fonts/liberation",
-    ];
-    for base in &candidates {
-        let path = std::path::Path::new(base);
-        if path.is_dir() {
-            if path.join("LiberationSans-Regular.ttf").exists() {
-                return Ok(path.to_path_buf());
+const BUNDLED_FONT: &[u8] = include_bytes!("../assets/fonts/DejaVuSans.ttf");
+
+/// Loads a font family for PDF export. Tries system fonts first (Linux, Windows, macOS),
+/// then falls back to the bundled DejaVu Sans. Fully offline.
+#[cfg(feature = "pdf")]
+fn load_pdf_font() -> Result<genpdf::fonts::FontFamily<genpdf::fonts::FontData>, crate::Error> {
+    use genpdf::fonts::{FontData, FontFamily, from_files};
+
+    // 1. Try system font directories (platform-specific)
+    if let Some(dir) = system_font_dir() {
+        // LiberationSans naming: LiberationSans-Regular.ttf, etc.
+        if let Ok(family) = from_files(&dir, "LiberationSans", None) {
+            return Ok(family);
+        }
+        // DejaVu naming: DejaVuSans.ttf or DejaVuSans-Regular.ttf
+        if dir.join("DejaVuSans-Regular.ttf").exists() {
+            if let Ok(family) = from_files(&dir, "DejaVuSans", None) {
+                return Ok(family);
             }
-            if path.join("DejaVuSans.ttf").exists() {
-                return Ok(path.to_path_buf());
+        }
+        // macOS: Arial.ttf, Helvetica.ttf in Supplemental
+        #[cfg(target_os = "macos")]
+        for name in &["Arial.ttf", "Helvetica.ttf", "DejaVuSans.ttf"] {
+            let p = dir.join(name);
+            if p.exists() {
+                if let Ok(data) = std::fs::read(&p) {
+                    if let Ok(fd) = FontData::new(data, None) {
+                        return Ok(FontFamily {
+                            regular: fd.clone(),
+                            bold: fd.clone(),
+                            italic: fd.clone(),
+                            bold_italic: fd.clone(),
+                        });
+                    }
+                }
+            }
+        }
+        if dir.join("DejaVuSans.ttf").exists() {
+            // DejaVu uses DejaVuSans.ttf for regular; genpdf expects -Regular suffix.
+            if let Ok(data) = std::fs::read(dir.join("DejaVuSans.ttf")) {
+                if let Ok(fd) = FontData::new(data, None) {
+                    return Ok(FontFamily {
+                        regular: fd.clone(),
+                        bold: fd.clone(),
+                        italic: fd.clone(),
+                        bold_italic: fd.clone(),
+                    });
+                }
+            }
+        }
+        // Windows: arial.ttf, verdana.ttf etc. (different naming than Liberation/DejaVu)
+        #[cfg(target_os = "windows")]
+        for name in &["arial.ttf", "verdana.ttf", "tahoma.ttf"] {
+            let p = dir.join(name);
+            if p.exists() {
+                if let Ok(data) = std::fs::read(&p) {
+                    if let Ok(fd) = FontData::new(data, None) {
+                        return Ok(FontFamily {
+                            regular: fd.clone(),
+                            bold: fd.clone(),
+                            italic: fd.clone(),
+                            bold_italic: fd.clone(),
+                        });
+                    }
+                }
             }
         }
     }
-    Err(crate::Error::Other(
-        "No suitable font found. Install liberation-fonts or dejavu-fonts, or enable PDF feature with system fonts.".into(),
-    ))
+
+    // 2. Fall back to bundled font (always works, fully offline)
+    let fd = FontData::new(BUNDLED_FONT.to_vec(), None)
+        .map_err(|e| crate::Error::Other(format!("Bundled font load failed: {}", e)))?;
+    Ok(FontFamily {
+        regular: fd.clone(),
+        bold: fd.clone(),
+        italic: fd.clone(),
+        bold_italic: fd.clone(),
+    })
+}
+
+/// Returns a directory containing usable fonts, or None. Platform-specific paths.
+#[cfg(feature = "pdf")]
+fn system_font_dir() -> Option<std::path::PathBuf> {
+    let candidates: Vec<std::path::PathBuf> = if cfg!(target_os = "windows") {
+        let mut paths = vec![std::path::PathBuf::from("C:\\Windows\\Fonts")];
+        if let Ok(windir) = std::env::var("WINDIR") {
+            paths.push(std::path::PathBuf::from(windir).join("Fonts"));
+        }
+        paths
+    } else if cfg!(target_os = "macos") {
+        let mut paths = vec![
+            std::path::PathBuf::from("/System/Library/Fonts/Supplemental"),
+            std::path::PathBuf::from("/Library/Fonts"),
+            std::path::PathBuf::from("/System/Library/Fonts"),
+        ];
+        if let Ok(home) = std::env::var("HOME") {
+            paths.push(std::path::PathBuf::from(home).join("Library/Fonts"));
+        }
+        paths
+    } else {
+        // Linux and other Unix
+        vec![
+            std::path::PathBuf::from("/usr/share/fonts/truetype/liberation"),
+            std::path::PathBuf::from("/usr/share/fonts/TTF"),
+            std::path::PathBuf::from("/usr/share/fonts/truetype/dejavu"),
+            std::path::PathBuf::from("/usr/local/share/fonts/liberation"),
+            std::path::PathBuf::from("/usr/share/fonts"),
+        ]
+    };
+
+    for path in &candidates {
+        if path.is_dir() {
+            if path.join("LiberationSans-Regular.ttf").exists()
+                || path.join("DejaVuSans.ttf").exists()
+                || path.join("DejaVuSans-Regular.ttf").exists()
+            {
+                return Some(path.clone());
+            }
+            #[cfg(target_os = "windows")]
+            if path.join("arial.ttf").exists() || path.join("verdana.ttf").exists() {
+                return Some(path.clone());
+            }
+            #[cfg(target_os = "macos")]
+            if path.join("Arial.ttf").exists()
+                || path.join("Helvetica.ttf").exists()
+                || path.join("DejaVuSans.ttf").exists()
+            {
+                return Some(path.clone());
+            }
+        }
+    }
+    None
 }
 
 #[cfg(feature = "pdf")]
@@ -461,6 +565,8 @@ mod tests {
         }
     }
 
+    /// Tests PDF export on Linux, Windows, and macOS. Uses bundled font when system
+    /// fonts are unavailable; fully offline.
     #[test]
     fn export_pdf_single_generates_sample_report() {
         let report = sample_report();
@@ -470,8 +576,12 @@ mod tests {
         assert!(out.exists(), "PDF file was not created");
         let meta = std::fs::metadata(&out).unwrap();
         assert!(meta.len() > 100, "PDF file appears empty or too small");
+        // Verify PDF header (works on all platforms)
+        let content = std::fs::read(&out).unwrap();
+        assert!(content.starts_with(b"%PDF"), "PDF file has invalid header");
     }
 
+    /// Tests batch PDF export on all platforms. Uses bundled font fallback when needed.
     #[test]
     fn export_pdf_batch_generates_sample_report() {
         let report = sample_report();
@@ -485,5 +595,7 @@ mod tests {
         assert!(out.exists(), "PDF file was not created");
         let meta = std::fs::metadata(&out).unwrap();
         assert!(meta.len() > 100, "PDF file appears empty or too small");
+        let content = std::fs::read(&out).unwrap();
+        assert!(content.starts_with(b"%PDF"), "PDF file has invalid header");
     }
 }

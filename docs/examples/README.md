@@ -24,10 +24,12 @@ pbr-cli report ./Materials/Wood --export pdf --output report.pdf
 # Batch HTML/PDF
 pbr-cli export-report ./Mat1 ./Mat2 --format html --output batch-report.html
 pbr-cli export-report ./Materials --format pdf --output report.pdf
+pbr-cli export-report ./Mat1 ./Mat2 --format json --output batch-report.json
 ```
 
 ## Report structure
 
-- **JSON**: `name`, `score`, `summary`, `issues`, `optimization_suggestions`, `vram_estimate`, `ai_insights`
+- **JSON (single)**: `name`, `score`, `summary`, `issues`, `optimization_suggestions`, `vram_estimate`, `ai_insights`
+- **JSON (batch)**: Array of `{ "path": "...", "report": { ... } }` — each `report` matches the single JSON schema
 - **HTML**: Styled layout with sections for each
 - **PDF**: Same content as HTML, rendered as PDF

@@ -50,6 +50,8 @@ Step-by-step implementation checklist for Cursor's vibe coding workflow. All tas
 |---|------|----------|--------------|-----------------|
 | 20 | **Document minimum glibc** – Add to BUILD-APPIMAGE or README: "Built on Ubuntu 22.04; requires glibc 2.31+ (or similar)" | Medium | None | Clear compatibility bounds |
 | 21 | **macOS code signing** – Configure Tauri for ad-hoc or Apple Developer signing; document in BUILD-MACOS | Low | Apple Developer account (optional) | DMG opens without Gatekeeper warning |
+
+**See also**: [BUILD-APPIMAGE.md](BUILD-APPIMAGE.md) (glibc validation), [BUILD-MACOS.md](BUILD-MACOS.md) (Gatekeeper/code signing), [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md) (pre-release steps).
 | 22 | **Cross-platform test matrix** – Add optional CI job that runs `pbr-cli check`, `batch-check`, `report --json` on Windows/macOS runners | Medium | None | CI asserts CLI works per OS |
 | 23 | **AppImage fuse3 fallback** – Document libfuse2 requirement; consider fuse3 compatibility if feasible | Low | None | Broader Linux support |
 
@@ -77,7 +79,7 @@ Step-by-step implementation checklist for Cursor's vibe coding workflow. All tas
 | 32 | **Plugin tutorial** – Expand `docs/plugins/README.md` with step-by-step: create plugin.json, define rules, add preset, test | Medium | None | Plugin tutorial |
 | 33 | **Advanced analysis docs** – Document `analyze` and `fix-tileability` in README; explain duplicate detection, cross-material, tileability | Medium | None | Advanced analysis docs |
 | 34 | **Pre-commit caveats** – Document that pre-commit requires git; add Troubleshooting section | Medium | None | Pre-commit docs |
-| 35 | **Build workflow** – All doc references point to `ci-release.yml`; verify BUILD-APPIMAGE, BUILD-MACOS, BUILD-WINDOWS | Medium | None | Correct workflow links |
+| 35 | **Build workflow** – All doc references point to `ci-release.yml`; verify BUILD-APPIMAGE, BUILD-MACOS, BUILD-WINDOWS | Medium | None | ✅ Done |
 
 ---
 
@@ -121,8 +123,7 @@ Step-by-step implementation checklist for Cursor's vibe coding workflow. All tas
 | `pbr-cli check <folder> --ci` | JSON to stdout, exit 1 if fail |
 | `pbr-cli batch-check <root> --ci` | JSON to stdout, exit 1 if any fail |
 | `pbr-cli report <folder> --json` | MaterialReport JSON to stdout |
-| `pbr-cli export-report <folders> --format html|pdf --output <path>` | HTML/PDF file |
-| `pbr-cli export-report <folders> --format json --output <path>` | **TODO** – batch JSON |
+| `pbr-cli export-report <folders> --format html|pdf|json --output <path>` | HTML/PDF/JSON file (local only) |
 | `pbr-cli analyze <root> --tileability` | Advanced analysis JSON to stdout |
 | `pbr-cli fix-tileability <path> --output <path>` | Fixed texture file |
 | `pbr-cli audit-log [--limit N] [--json] [--output FILE] [--format json|text]` | Audit entries to stdout or file (JSON/text) |

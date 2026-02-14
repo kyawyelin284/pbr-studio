@@ -2,6 +2,14 @@
 
 Desktop application with Blender-style layout. All operations run **offline**—no cloud or network.
 
+## Desktop app only
+
+PBR Studio requires the **Tauri desktop build** for filesystem access (material folders, export, validation). If you open the app in a web browser (e.g. via `npm run dev` without Tauri), you will see:
+
+> **PBR Studio is a desktop application. Please download the desktop app for Linux, Windows, or macOS.**
+
+In that case, all UI actions that need filesystem access (add materials, export, report generation) are hidden. Use `npm run tauri:dev` or build the desktop app to access the full interface.
+
 ## Layout
 
 | Panel | Purpose |
@@ -16,7 +24,7 @@ Desktop application with Blender-style layout. All operations run **offline**—
 ### Add materials
 
 1. **Drag and drop** – Drop material folders or parent folders onto the left panel
-2. **Open folder** – Click the folder icon to browse and select material directories
+2. **Add folders** – Click **Add folders** to select one or more material directories (multi-select supported)
 3. Materials are auto-detected by texture slots (albedo, normal, roughness, etc.)
 
 ### Analyze
@@ -44,10 +52,10 @@ Desktop application with Blender-style layout. All operations run **offline**—
 
 ### Batch export
 
-1. Select multiple materials (Shift+click or Select All)
-2. Click **Batch Export**
-3. Choose preset and output folder
-4. Each material exports to a subfolder
+1. Add multiple materials (Add folders or drag-drop)
+2. Use **Batch 4K**, **Batch Unreal Engine**, etc. to export all (or selected) materials
+3. Choose output folder; each material exports to a subfolder
+4. **Export report (all)** – HTML/PDF report for all materials from the validation panel
 
 ### Report export
 

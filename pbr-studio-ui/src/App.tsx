@@ -4,6 +4,7 @@ import { Viewport3D, type TextureUrls } from './components/Viewport3D';
 import { ValidationPanel } from './components/ValidationPanel';
 import { ConsolePanel, type LogEntry, type LogLevel } from './components/ConsolePanel';
 import { AuditLogPanel } from './components/AuditLogPanel';
+import { AdvancedAnalysisPanel } from './components/AdvancedAnalysisPanel';
 import { SettingsPanel } from './components/SettingsPanel';
 import { usePreferences } from './context/PreferencesContext';
 import { useUndoRedo } from './hooks/useUndoRedo';
@@ -63,7 +64,11 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [hdriPreset, setHdriPreset] = useState('studio');
   const [dragOver, setDragOver] = useState(false);
-  const [bottomTab, setBottomTab] = useState<'console' | 'audit'>('console');
+  const [bottomTab, setBottomTab] = useState<'console' | 'audit' | 'advanced'>('console');
+  const [tileabilityPreview, setTileabilityPreview] = useState<{
+    originalUrls: TextureUrls;
+    fixedTextureUrls: TextureUrls;
+  } | null>(null);
   const [auditRefreshTrigger, setAuditRefreshTrigger] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [textureRefreshKey, setTextureRefreshKey] = useState(0);
@@ -208,12 +213,13 @@ function App() {
   const handleAnalyze = useCallback(
     async (pathOverride?: string) => {
       const path = pathOverride ?? (selectedIndex != null ? materials[selectedIndex]?.path : null);
-      if (!path) {
-        setError('Please select or add a material folder first.');
-        log('warn', 'Please select or add a material folder first.');
+      const pathsToUse = path ? [path] : (materials.length > 0 ? materials.map((m) => m.path) : []);
+      if (!pathsToUse.length) {
+        setError('Please add material folders first (use Add folders or drag-drop).');
+        log('warn', 'Please add material folders first.');
         return;
       }
-      await analyzeAndAddMaterials([path]);
+      await analyzeAndAddMaterials(pathsToUse);
     },
     [materials, selectedIndex, analyzeAndAddMaterials, log]
   );
@@ -351,6 +357,75 @@ function App() {
       handleExportReport(paths, 'html');
     }
   }, [selectedIndices, materials, handleExportReport]);
+
+  const handleBatchExportPreset = useCallback(
+    async (preset: string, includeLod?: boolean) => {
+      if (!isTauri || materials.length === 0) return;
+      const paths = selectedIndices.length > 0
+        ? selectedIndices.map((i) => materials[i]?.path).filter(Boolean) as string[]
+        : materials.map((m) => m.path);
+      if (paths.length === 0) return;
+      try {
+        const { open } = await import('@tauri-apps/plugin-dialog');
+        const outputRoot = await open({
+          directory: true,
+          multiple: false,
+          title: `Batch export (${paths.length} materials) – choose output folder`,
+        });
+        if (!outputRoot || typeof outputRoot !== 'string') return;
+
+        setExportLoading(true);
+        setError(null);
+        const presetLabel = preset === 'unreal' ? 'Unreal Engine' : preset === 'unity' ? 'Unity' : preset === 'mobile' ? 'Mobile' : preset;
+        log('info', `Batch exporting ${paths.length} material(s) as ${presetLabel} to ${outputRoot}`);
+        const { invoke } = await import('@tauri-apps/api/core');
+        const written = await invoke<string[]>('batch_export_preset', {
+          sourcePaths: paths,
+          outputRoot,
+          preset,
+          includeLod: includeLod ?? false,
+          pluginsDir: preferences.pluginsDir || undefined,
+        });
+        setError(null);
+        if (written?.length) {
+          log('success', `Exported ${written.length} texture(s) to ${outputRoot}`);
+          setAuditRefreshTrigger((t) => t + 1);
+          const { message } = await import('@tauri-apps/plugin-dialog');
+          await message(
+            `Exported ${written.length} texture(s) to:\n${outputRoot}`,
+            { title: 'Batch export complete', kind: 'info' }
+          );
+        }
+      } catch (e) {
+        const msg = String(e);
+        setError(msg);
+        log('error', `Batch export failed: ${msg}`);
+      } finally {
+        setExportLoading(false);
+      }
+    },
+    [isTauri, materials, selectedIndices, log, preferences.pluginsDir]
+  );
+
+  const handleTileabilityPreview = useCallback(
+    async (originalUrls: TextureUrls, fixedAlbedoPath: string) => {
+      try {
+        const { convertFileSrc } = await import('@tauri-apps/api/core');
+        const url = convertFileSrc(fixedAlbedoPath) + `?t=${Date.now()}`;
+        setTileabilityPreview({
+          originalUrls,
+          fixedTextureUrls: { ...originalUrls, albedo: url },
+        });
+      } catch {
+        setTileabilityPreview(null);
+      }
+    },
+    []
+  );
+
+  const handleClearTileabilityPreview = useCallback(() => {
+    setTileabilityPreview(null);
+  }, []);
 
   const handleRefreshSelected = useCallback(async () => {
     const path = selectedIndex != null ? materials[selectedIndex]?.path : null;
@@ -518,6 +593,24 @@ function App() {
     return () => clearInterval(interval);
   }, [isTauri, watchedPaths.join('|'), loadTextureUrls, setWithoutHistory, log, preferences.pluginsDir]);
 
+  // When running in browser without Tauri, show desktop-only message and hide filesystem-dependent UI
+  if (!isTauri) {
+    return (
+      <div className="app desktop-only-overlay">
+        <div className="desktop-only-content">
+          <div className="desktop-only-icon" aria-hidden="true">🖥</div>
+          <h1 className="desktop-only-title">PBR Studio</h1>
+          <p className="desktop-only-message">
+            PBR Studio is a desktop application. Please download the desktop app for Linux, Windows, or macOS.
+          </p>
+          <p className="desktop-only-hint">
+            Use <code>npm run tauri:dev</code> or build the desktop app to access material analysis, validation, and export.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="app">
       <button
@@ -546,6 +639,7 @@ function App() {
           onRefresh={handleRefreshSelected}
           dragOver={dragOver}
           onExportPreset={handleExportPreset}
+          onBatchExportPreset={handleBatchExportPreset}
           exportLoading={exportLoading}
           materials={materials.map((m) => ({ path: m.path, name: m.name, score: m.report?.score ?? null, loading: m.loading }))}
           selectedIndex={selectedIndex}
@@ -566,14 +660,22 @@ function App() {
           onRedo={redo}
         />
         <Viewport3D
-          textureUrls={currentTextureUrls}
-          textureUrlsB={compareIndex != null ? compareTextureUrls : undefined}
+          textureUrls={tileabilityPreview ? tileabilityPreview.originalUrls : currentTextureUrls}
+          textureUrlsB={
+            tileabilityPreview
+              ? tileabilityPreview.fixedTextureUrls
+              : compareIndex != null
+                ? compareTextureUrls
+                : undefined
+          }
           hdriPreset={hdriPreset}
           onPresetChange={setHdriPreset}
-          compareMode={compareIndex != null}
-          labelA={selectedIndex != null ? materials[selectedIndex]?.name : 'A'}
-          labelB={compareIndex != null ? materials[compareIndex]?.name : 'B'}
+          compareMode={tileabilityPreview != null || compareIndex != null}
+          labelA={tileabilityPreview ? 'Original' : selectedIndex != null ? materials[selectedIndex]?.name : 'A'}
+          labelB={tileabilityPreview ? 'Fixed' : compareIndex != null ? materials[compareIndex]?.name : 'B'}
           refreshKey={textureRefreshKey}
+          tileabilityPreviewActive={tileabilityPreview != null}
+          onClearTileabilityPreview={handleClearTileabilityPreview}
         />
         <ValidationPanel
           report={currentReport}
@@ -604,11 +706,27 @@ function App() {
           >
             Audit Log
           </button>
+          <button
+            type="button"
+            className={`bottom-tab ${bottomTab === 'advanced' ? 'active' : ''}`}
+            onClick={() => setBottomTab('advanced')}
+          >
+            Advanced Analysis
+          </button>
         </div>
         {bottomTab === 'console' ? (
           <ConsolePanel entries={consoleEntries} />
-        ) : (
+        ) : bottomTab === 'audit' ? (
           <AuditLogPanel isTauri={isTauri} refreshTrigger={auditRefreshTrigger} />
+        ) : (
+          <AdvancedAnalysisPanel
+            materialPaths={exportPaths}
+            currentTextureUrls={currentTextureUrls}
+            isTauri={isTauri}
+            onLog={log}
+            onTileabilityPreview={handleTileabilityPreview}
+            onClearTileabilityPreview={handleClearTileabilityPreview}
+          />
         )}
       </div>
     </div>

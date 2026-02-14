@@ -44,7 +44,7 @@ npm ci
 npm run msi
 ```
 
-Output: `src-tauri/target/release/bundle/msi/pbr-studio-ui_0.1.0_x64_en-US.msi`
+Output: `src-tauri/target/release/bundle/msi/pbr-studio-ui_1.0.0_x64_en-US.msi`
 
 ### Option B: Full build (all formats)
 
@@ -53,6 +53,10 @@ npm run tauri:build
 ```
 
 This produces both MSI and NSIS (`.exe`) installers.
+
+### Option C: GitHub Actions (tag-based)
+
+Push a version tag (e.g. `v1.0.0`) to trigger cross-platform builds including Windows MSI. See [CI-RELEASE.md](CI-RELEASE.md).
 
 ## Configuration
 

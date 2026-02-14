@@ -54,9 +54,17 @@ struct CiOptimizationSuggestion {
     message: String,
 }
 
+/// Batch JSON export entry: path + MaterialReport (matches report <folder> --json schema)
+#[derive(Debug, Serialize)]
+struct BatchJsonEntry {
+    path: String,
+    report: MaterialReport,
+}
+
 #[derive(Parser)]
 #[command(name = "pbr-cli")]
 #[command(about = "Offline PBR texture set analyzer. CI-integratable.")]
+#[command(version = concat!("v", env!("CARGO_PKG_VERSION")))]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -174,7 +182,7 @@ enum Commands {
         /// Path(s) to material folder(s)
         #[arg(value_name = "FOLDER", num_args = 1..)]
         folders: Vec<PathBuf>,
-        /// Output format: html or pdf
+        /// Output format: html, pdf, or json
         #[arg(short, long, default_value = "html")]
         format: String,
         /// Output file path
@@ -582,12 +590,12 @@ fn cmd_batch_check(root: &PathBuf, min_score: i32, ci: bool, output_path: Option
     if ci {
         println!("{}", serde_json::to_string(&output)?);
     } else {
+        let total_critical: usize = output.results.iter().map(|r| r.critical_count).sum();
+        let total_major: usize = output.results.iter().map(|r| r.major_count).sum();
         println!("\n--- Summary ---");
         println!("Scanned {} material folder(s)", material_folders.len());
         println!("{} folder(s) below threshold", failed_count);
-        println!("{} total critical, {} total major",
-            results.iter().map(|r| r.critical_count).sum::<usize>(),
-            results.iter().map(|r| r.major_count).sum::<usize>());
+        println!("{} total critical, {} total major", total_critical, total_major);
     }
 
     // Exit non-zero if any material score is below threshold
@@ -834,7 +842,7 @@ fn is_material_folder(path: &Path) -> bool {
     let Ok(entries) = std::fs::read_dir(path) else {
         return false;
     };
-    const EXTS: &[&str] = &["png", "jpg", "jpeg", "tga"];
+    const EXTS: &[&str] = &["png", "jpg", "jpeg", "tga", "exr"];
     const SLOTS: &[&str] = &[
         "albedo", "basecolor", "diffuse", "color",
         "normal", "norm",
@@ -959,7 +967,20 @@ fn cmd_export_report(
                 export_pdf_batch(&reports, output)?;
             }
         }
-        _ => return Err(format!("Unknown format: {}. Use html or pdf.", format).into()),
+        "json" => {
+            // Batch JSON: array of { path, report } matching report <folder> --json schema
+            let batch: Vec<BatchJsonEntry> = reports
+                .iter()
+                .map(|(path, report)| BatchJsonEntry {
+                    path: path.clone(),
+                    report: report.clone(),
+                })
+                .collect();
+            let json = serde_json::to_string_pretty(&batch)
+                .map_err(|e| format!("JSON serialization failed: {}", e))?;
+            std::fs::write(output, json)?;
+        }
+        _ => return Err(format!("Unknown format: {}. Use html, pdf, or json.", format).into()),
     }
 
     for (path_str, report) in &reports {
@@ -1060,4 +1081,50 @@ fn cmd_audit_log(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_test_material_dir() -> (tempfile::TempDir, PathBuf) {
+        let tmp = tempfile::tempdir().unwrap();
+        let mat1 = tmp.path().join("mat1");
+        std::fs::create_dir_all(&mat1).unwrap();
+        let img = image::RgbaImage::from_raw(4, 4, vec![128u8; 4 * 4 * 4]).unwrap();
+        img.save(mat1.join("albedo.png")).unwrap();
+        img.save(mat1.join("normal.png")).unwrap();
+        img.save(mat1.join("roughness.png")).unwrap();
+        (tmp, mat1)
+    }
+
+    #[test]
+    fn export_report_format_json_batch() {
+        let (tmp, mat1) = create_test_material_dir();
+        let mat2_path = tmp.path().join("mat2");
+        std::fs::create_dir_all(&mat2_path).unwrap();
+        let img = image::RgbaImage::from_raw(4, 4, vec![64u8; 4 * 4 * 4]).unwrap();
+        img.save(mat2_path.join("albedo.png")).unwrap();
+        img.save(mat2_path.join("roughness.png")).unwrap();
+
+        let out = tmp.path().join("batch-report.json");
+        let folders = vec![mat1.clone(), mat2_path];
+        let result = cmd_export_report(&folders, "json", &out, false);
+
+        assert!(result.is_ok(), "export-report json failed: {:?}", result.err());
+        assert!(out.exists(), "JSON file was not created");
+
+        let content = std::fs::read_to_string(&out).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
+        let arr = parsed.as_array().expect("expected JSON array");
+        assert_eq!(arr.len(), 2, "expected 2 material reports");
+
+        for (i, entry) in arr.iter().enumerate() {
+            assert!(entry.get("path").is_some(), "entry {} missing path", i);
+            let report = entry.get("report").expect("entry missing report");
+            assert!(report.get("score").is_some(), "report missing score");
+            assert!(report.get("summary").is_some(), "report missing summary");
+            assert!(report.get("issues").is_some(), "report missing issues");
+        }
+    }
 }

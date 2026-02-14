@@ -97,10 +97,8 @@ CI workflow (`.github/workflows/ci-release.yml`) builds AppImage, MSI, DMG on ta
 
 ### ⚠️ GAPS / ISSUES
 
-1. **README workflow links** – Points to `release.yml` and `build-appimage.yml`, which no longer exist. Should reference `ci-release.yml`.
-2. **BUILD-APPIMAGE.md** – Same outdated workflow references.
-3. **Linux glibc** – Built on Ubuntu 22.04; may fail on older distros (e.g. CentOS 7). Document minimum glibc or build on older base.
-4. **macOS code signing** – Not configured; DMG may trigger Gatekeeper. Optional for initial release.
+1. **Linux glibc** – Built on Ubuntu 22.04; may fail on older distros (e.g. CentOS 7). Document minimum glibc or build on older base.
+2. **macOS code signing** – Not configured; DMG may trigger Gatekeeper. Optional for initial release.
 
 ---
 
@@ -132,11 +130,7 @@ CI workflow (`.github/workflows/ci-release.yml`) builds AppImage, MSI, DMG on ta
 
 ### ⚠️ GAPS / ISSUES
 
-1. **README** – Line 199: "See `.github/workflows/release.yml`" → should be `ci-release.yml`.
-2. **BUILD-APPIMAGE.md** – Lines 77–78: References `release.yml` and `build-appimage.yml` → update to `ci-release.yml`.
-3. **CLI `export-report`** – Not documented in README CLI table; only `report` is listed.
-4. **Audit log** – `audit-log` command not in README.
-5. **`pbr-cli` vs `pbr-studio-ui`** – README mentions both; `pbr-cli` binary path (`target/release/pbr-cli`) is clear; no separate install instructions for packaged app.
+1. **`pbr-cli` vs `pbr-studio-ui`** – README mentions both; `pbr-cli` binary path (`target/release/pbr-cli`) is clear; no separate install instructions for packaged app.
 
 ---
 
@@ -144,22 +138,12 @@ CI workflow (`.github/workflows/ci-release.yml`) builds AppImage, MSI, DMG on ta
 
 | Priority | Feature | Notes |
 |----------|---------|-------|
-| **High** | PDF on Windows/macOS | Font path logic is Linux-only |
-| **High** | Update doc workflow refs | README, BUILD-APPIMAGE |
-| **Medium** | `export-report --format json` | Batch JSON export |
-| **Medium** | "Desktop only" message | When run in browser without Tauri |
 | **Low** | EXR input support | Marked as planned |
 | **Low** | macOS code signing | Improves Gatekeeper experience |
 
 ---
 
 ## 8. Bugs / Incomplete Modules
-
-| Severity | Issue | Location |
-|----------|-------|----------|
-| **Medium** | PDF font lookup fails on Windows/macOS | `pbr-core/report_export.rs` |
-| **Low** | Stale workflow refs in docs | README, BUILD-APPIMAGE |
-| **Low** | CLI `export-report` missing from README | README.md |
 
 No critical logic bugs found in validation, optimization, or UI flows.
 
@@ -193,17 +177,12 @@ No critical logic bugs found in validation, optimization, or UI flows.
 
 ### Before First Production Release
 
-1. **Fix documentation** – Update README and BUILD-APPIMAGE to reference `ci-release.yml`.
-2. **PDF fonts** – Add Windows/macOS font paths or bundle a font for PDF export.
-3. **Document `export-report`** – Add to README CLI table.
-4. **Document `audit-log`** – Add to README CLI table.
+All high-priority items addressed: workflow refs, PDF fonts (bundled + platform paths), `export-report --format json`, "Desktop only" message in browser.
 
 ### Nice to Have
 
-1. Add `export-report --format json` for batch JSON.
-2. Show "Desktop app only" message when run in browser.
-3. Add `--help` examples for common workflows.
-4. Consider code signing for macOS (and optionally Windows).
+1. Add `--help` examples for common workflows.
+2. Consider code signing for macOS (and optionally Windows).
 
 ### Already Solid
 

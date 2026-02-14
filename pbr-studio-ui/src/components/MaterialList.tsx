@@ -127,16 +127,16 @@ export function MaterialList({
           </button>
         </div>
       </div>
-      {hasSelection && (onBatchAnalyze || onBatchExport) && (
+      {materials.length > 0 && (onBatchAnalyze || onBatchExport) && (
         <div className="material-list-batch-actions">
           {onBatchAnalyze && (
             <button type="button" onClick={onBatchAnalyze} className="batch-btn">
-              Analyze {selectedIndices.length} selected
+              {hasSelection ? `Analyze ${selectedIndices.length} selected` : 'Analyze all'}
             </button>
           )}
           {onBatchExport && (
             <button type="button" onClick={onBatchExport} className="batch-btn">
-              Export report {selectedIndices.length} selected
+              {hasSelection ? `Export report (${selectedIndices.length})` : 'Export report (all)'}
             </button>
           )}
         </div>
