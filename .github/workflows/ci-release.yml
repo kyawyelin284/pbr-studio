@@ -1,0 +1,265 @@
+# CI + Release workflow: batch checks, report generation, cross-platform builds.
+# Triggers on tag pushes (v*) and manual dispatch.
+# Optional: set ARTIFACT_STORAGE_URL for enterprise pipeline integration.
+
+name: CI & Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  RUST_BACKTRACE: 1
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # CLI: batch check on tag push (CI mode)
+  # ---------------------------------------------------------------------------
+  cli-batch-check:
+    name: CLI batch check
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Create fixtures
+        run: |
+          mkdir -p ci/fixtures
+          chmod +x ci/fixtures/create-fixtures.sh 2>/dev/null || true
+          ./ci/fixtures/create-fixtures.sh ci/fixtures
+
+      - name: Build CLI
+        run: cargo build -p pbr-cli --release
+
+      - name: Run batch check (CI mode)
+        run: |
+          ./target/release/pbr-cli batch-check ci/fixtures --min-score 0 --ci | tee batch-check-output.json
+
+  # ---------------------------------------------------------------------------
+  # Report generation: PDF + HTML from fixtures
+  # ---------------------------------------------------------------------------
+  generate-reports:
+    name: Generate reports
+    runs-on: ubuntu-22.04
+    needs: cli-batch-check
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install font for PDF
+        run: sudo apt-get update && sudo apt-get install -y fonts-liberation
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Create fixtures
+        run: |
+          mkdir -p ci/fixtures
+          chmod +x ci/fixtures/create-fixtures.sh 2>/dev/null || true
+          ./ci/fixtures/create-fixtures.sh ci/fixtures
+
+      - name: Build CLI
+        run: cargo build -p pbr-cli --release
+
+      - name: Generate reports
+        run: |
+          mkdir -p reports
+          ./target/release/pbr-cli export-report ci/fixtures/sample-material \
+            --format html --output reports/pbr-report.html
+          ./target/release/pbr-cli export-report ci/fixtures/sample-material \
+            --format pdf --output reports/pbr-report.pdf
+
+      - name: Upload reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: pbr-reports
+          path: reports/
+
+  # ---------------------------------------------------------------------------
+  # Cross-platform Tauri builds: AppImage, MSI, DMG
+  # ---------------------------------------------------------------------------
+  build-linux-appimage:
+    name: Linux AppImage
+    runs-on: ubuntu-22.04
+    needs: cli-batch-check
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libfuse2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: pbr-studio-ui/package-lock.json
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend deps
+        working-directory: pbr-studio-ui
+        run: npm ci
+
+      - name: Build AppImage
+        working-directory: pbr-studio-ui
+        run: npm run tauri build -- --bundles appimage --ci
+
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: pbr-studio-linux-appimage
+          path: pbr-studio-ui/src-tauri/target/release/bundle/appimage/*.AppImage
+
+  build-windows-msi:
+    name: Windows MSI
+    runs-on: windows-latest
+    needs: cli-batch-check
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: pbr-studio-ui/package-lock.json
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend deps
+        working-directory: pbr-studio-ui
+        run: npm ci
+
+      - name: Build MSI
+        working-directory: pbr-studio-ui
+        run: npm run tauri build -- --bundles msi --ci
+
+      - name: Upload MSI
+        uses: actions/upload-artifact@v4
+        with:
+          name: pbr-studio-windows-msi
+          path: pbr-studio-ui/src-tauri/target/release/bundle/msi/*.msi
+
+  build-macos-dmg:
+    name: macOS DMG
+    runs-on: macos-latest
+    needs: cli-batch-check
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: pbr-studio-ui/package-lock.json
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend deps
+        working-directory: pbr-studio-ui
+        run: npm ci
+
+      - name: Build DMG
+        working-directory: pbr-studio-ui
+        run: npm run tauri build -- --bundles dmg --ci
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: pbr-studio-macos-dmg
+          path: pbr-studio-ui/src-tauri/target/release/bundle/dmg/*.dmg
+
+  # ---------------------------------------------------------------------------
+  # Optional: Enterprise artifact storage (triggered when secret is set)
+  # ---------------------------------------------------------------------------
+  enterprise-artifact-storage:
+    name: Enterprise artifact storage
+    runs-on: ubuntu-latest
+    needs:
+      - generate-reports
+      - build-linux-appimage
+      - build-windows-msi
+      - build-macos-dmg
+    if: |
+      github.event_name == 'push' &&
+      startsWith(github.ref, 'refs/tags/v') &&
+      secrets.ARTIFACT_STORAGE_URL != ''
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Upload to enterprise storage
+        env:
+          ARTIFACT_URL: ${{ secrets.ARTIFACT_STORAGE_URL }}
+          ARTIFACT_TOKEN: ${{ secrets.ARTIFACT_STORAGE_TOKEN }}
+        run: |
+          echo "Enterprise artifact storage is configured."
+          echo "Set ARTIFACT_STORAGE_URL and optionally ARTIFACT_STORAGE_TOKEN in repo secrets."
+          echo "Artifacts downloaded to ./artifacts for custom upload logic."
+          echo ""
+          echo "To integrate with your pipeline, add a step that uploads the artifacts/ directory"
+          echo "to your artifact store (S3, Artifactory, Azure Blob, etc.) using the URL."
+          echo ""
+          echo "Example (customize for your stack):"
+          echo "  curl -X PUT -H \"Authorization: Bearer \$ARTIFACT_TOKEN\" \\"
+          echo "    -T artifacts/* \\"
+          echo "    \"\$ARTIFACT_URL/$(echo $GITHUB_REF_NAME | sed 's/^v//')\""
+          # Uncomment and customize below for your storage:
+          # if [ -n "$ARTIFACT_URL" ]; then
+          #   for f in artifacts/*/*; do
+          #     curl -X PUT -H "Authorization: Bearer $ARTIFACT_TOKEN" -T "$f" "$ARTIFACT_URL/$(basename $f)"
+          #   done
+          # fi
+
+  # ---------------------------------------------------------------------------
+  # Publish GitHub Release (on tag push)
+  # ---------------------------------------------------------------------------
+  publish-release:
+    name: Publish release
+    runs-on: ubuntu-latest
+    needs:
+      - generate-reports
+      - build-linux-appimage
+      - build-windows-msi
+      - build-macos-dmg
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release ${{ github.ref_name }}
+          draft: true
+          generate_release_notes: true
+          files: |
+            release-artifacts/**/*.AppImage
+            release-artifacts/**/*.msi
+            release-artifacts/**/*.dmg
+            release-artifacts/**/*.html
+            release-artifacts/**/*.pdf
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

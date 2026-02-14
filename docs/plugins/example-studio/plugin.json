@@ -1,0 +1,33 @@
+{
+  "name": "example-studio",
+  "version": "1.0.0",
+  "rules": [
+    {
+      "id": "max_8k",
+      "description": "Max resolution 8K for cinematic assets",
+      "severity": "major",
+      "condition": {
+        "type": "max_resolution",
+        "max_width": 8192,
+        "max_height": 8192
+      }
+    },
+    {
+      "id": "require_height",
+      "description": "Height map required for parallax",
+      "severity": "minor",
+      "condition": {
+        "type": "required_maps",
+        "maps": ["height"]
+      }
+    }
+  ],
+  "presets": [
+    {
+      "id": "cinematic",
+      "name": "Cinematic 4K",
+      "target_resolution": "4k",
+      "include_lod": true
+    }
+  ]
+}

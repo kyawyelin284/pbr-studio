@@ -7,7 +7,11 @@ A fully offline, open-source PBR texture set analyzer and exporter. Optimized fo
 - **Validation**: Required maps, resolution, power-of-two, albedo brightness, roughness uniformity, metallic mid-gray, normal strength, tileability
 - **Scoring**: 0–100 material score with Critical/Major/Minor severities
 - **Optimization**: Resize to 1K/2K/4K, channel packing (R=AO, G=Roughness, B=Metallic)
-- **Export presets**: 4K, Unreal Engine, Unity, Mobile
+- **Export presets**: 4K, Unreal Engine, Unity, Mobile + custom plugin presets
+- **Batch analysis**: Duplicate detection, cross-material consistency, tileability
+- **Plugin system**: Custom validation rules and presets (JSON/TOML)
+- **AI modules**: Material classification, smart suggestions, anomaly detection (optional ONNX)
+- **Audit logging**: Track validation, optimization, report actions locally
 - **Offline**: No backend, cloud, or database—runs entirely locally
 
 ## Architecture
@@ -32,15 +36,19 @@ cargo build -p pbr-cli --release
 | `check <folder>` | Validate a material folder; exit 1 if score < min        |
 | `batch-check <root>` | Recursively scan for material folders and summarize     |
 | `pre-commit` | Validate materials with staged files (for Git hooks)    |
-| `analyze <root>` | Advanced analysis (duplicates, cross-material, tileability) |
-| `fix-tileability <path> --output <path>` | Apply tileability fix to texture |
 | `optimize <folder> --output <path> --target <preset>` | Export optimized textures; `--lod` for LOD chain |
 | `batch-optimize <root> --output <path> --target <preset>` | Batch export all materials under root |
 | `report <folder> --json` | Generate text or JSON report; `--vram` for VRAM estimate |
-| `export-report <folders> --format html|pdf --output <path>` | Export HTML or PDF reports for one or more material folders |
-| `audit-log [--limit N] [--json]` | Show audit log (validation, optimization, report actions) |
+| `export-report <folders> --format html\|pdf --output <path>` | Export HTML or PDF reports |
+| `analyze <root>` | Advanced analysis (duplicates, cross-material, tileability) |
+| `fix-tileability <path> --output <path>` | Apply tileability fix to texture |
+| `audit-log [--limit N] [--json] [-o FILE] [--format json\|text]` | Show or export audit log |
+| `plugin-list` | List loaded plugins (rules and presets) |
+| `ai-analyze <folder> [--model path]` | AI classification, suggestions, anomaly detection |
 
 The CLI exits with code 1 if any material score is below the configured `--min-score` threshold.
+
+**Full CLI reference:** [docs/CLI-USAGE.md](docs/CLI-USAGE.md)
 
 ### Examples
 
@@ -155,12 +163,9 @@ Use `--ci` to output structured JSON for automated pipelines:
 
 ## Desktop App (pbr-studio-ui)
 
-Blender-style layout with:
+Blender-style layout: left (materials), center (3D viewport), right (validation), bottom (console/audit log).
 
-- Left panel: asset list, drag-and-drop
-- Center: 3D viewport
-- Right panel: validation and reports
-- Bottom: console / log panel
+**UI guide:** [docs/UI-GUIDE.md](docs/UI-GUIDE.md)
 
 ### Development
 
@@ -177,11 +182,38 @@ cd pbr-studio-ui
 npm run tauri:build
 ```
 
-See [docs/](docs/) for platform-specific builds:
+## Production Builds
 
-- [Linux AppImage](docs/BUILD-APPIMAGE.md)
-- [macOS DMG](docs/BUILD-MACOS.md)
-- [Windows MSI](docs/BUILD-WINDOWS.md)
+### Linux (AppImage)
+
+```bash
+./scripts/build-appimage.sh
+# Output: target/release/bundle/appimage/*.AppImage
+```
+
+See [docs/BUILD-APPIMAGE.md](docs/BUILD-APPIMAGE.md) for dependencies (WebKit, librsvg, etc.).
+
+### macOS (DMG)
+
+```bash
+cd pbr-studio-ui && npm run tauri:build
+# Or: npm run dmg
+```
+
+See [docs/BUILD-MACOS.md](docs/BUILD-MACOS.md) for Xcode/Apple requirements.
+
+### Windows (MSI)
+
+```bash
+cd pbr-studio-ui && npm run tauri:build
+# Or: npm run msi
+```
+
+See [docs/BUILD-WINDOWS.md](docs/BUILD-WINDOWS.md) for Visual Studio/WebView2.
+
+### Offline verification
+
+All builds run **offline**—no network during analysis, validation, or export. Audit logs, plugins, and reports use local paths only.
 
 ## Release builds (GitHub Actions)
 
@@ -200,6 +232,18 @@ This builds:
 
 Artifacts are uploaded to a draft GitHub release. See [.github/workflows/ci-release.yml](.github/workflows/ci-release.yml).
 
+## Documentation
+
+| Doc | Description |
+|-----|--------------|
+| [CLI-USAGE.md](docs/CLI-USAGE.md) | Full CLI reference with examples |
+| [UI-GUIDE.md](docs/UI-GUIDE.md) | Desktop app usage |
+| [FEATURES.md](docs/FEATURES.md) | Batch analysis, plugins, AI, optimization presets |
+| [plugins/README.md](docs/plugins/README.md) | Plugin system (rules, presets) |
+| [ai-module.md](docs/ai-module.md) | AI classification, suggestions, anomaly detection |
+| [examples/](docs/examples/) | Sample JSON/HTML report outputs |
+| [BUILD-TESTING.md](docs/BUILD-TESTING.md) | Build verification, platform prerequisites |
+
 ## Supported formats
 
 - **Input**: PNG, JPG, TGA (EXR support planned)
@@ -209,4 +253,3 @@ Artifacts are uploaded to a draft GitHub release. See [.github/workflows/ci-rele
 ## License
 
 See the repository for license information.
-# pbr-studio

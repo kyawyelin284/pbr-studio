@@ -1,0 +1,12 @@
+# Example plugin with TOML manifest
+name = "script-example"
+version = "1.0.0"
+
+[[rules]]
+id = "custom_script"
+description = "Python/Lua script validation"
+severity = "major"
+[rules.condition]
+type = "script"
+command = "python3"
+args = ["/path/to/validate.py"]

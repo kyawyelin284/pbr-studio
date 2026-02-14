@@ -1,0 +1,29 @@
+# Rust
+/target
+**/*.rs.bk
+
+# Node / frontend (pbr-studio-ui)
+node_modules
+dist
+dist-ssr
+*.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor
+.idea
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*.swo
+.DS_Store
+
+# Environment
+.env
+.env.local
+.env.*.local

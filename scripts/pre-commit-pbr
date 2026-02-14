@@ -1,0 +1,23 @@
+#!/bin/sh
+# Pre-commit hook: validate PBR materials with staged texture changes
+# Install: cp scripts/pre-commit-pbr .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+# Or add to .git/hooks/pre-commit if you already have other hooks:
+
+PBR_CLI="$(command -v pbr-cli 2>/dev/null)"
+if [ -z "$PBR_CLI" ]; then
+  # Prefer built binary from workspace
+  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+  ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+  if [ -f "$ROOT/target/release/pbr-cli" ]; then
+    PBR_CLI="$ROOT/target/release/pbr-cli"
+  elif [ -f "$ROOT/target/debug/pbr-cli" ]; then
+    PBR_CLI="$ROOT/target/debug/pbr-cli"
+  fi
+fi
+
+if [ -z "$PBR_CLI" ]; then
+  echo "pbr-cli not found. Install with: cargo build -p pbr-cli --release"
+  exit 1
+fi
+
+exec "$PBR_CLI" pre-commit --min-score 60

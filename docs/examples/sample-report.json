@@ -1,0 +1,53 @@
+{
+  "name": "Wood_Floor",
+  "score": 75,
+  "summary": {
+    "texture_count": 5,
+    "dimensions": { "width": 2048, "height": 2048 },
+    "maps": {
+      "albedo": true,
+      "normal": true,
+      "roughness": true,
+      "metallic": true,
+      "ao": true,
+      "height": false
+    },
+    "dimensions_consistent": true
+  },
+  "issues": [
+    {
+      "rule_id": "required_maps",
+      "severity": "minor",
+      "message": "Height map recommended for parallax"
+    }
+  ],
+  "optimization_suggestions": [
+    {
+      "category": "resolution",
+      "message": "Textures above 2K may be larger than needed for many use cases",
+      "priority": 1
+    }
+  ],
+  "passed": true,
+  "error_count": 0,
+  "warning_count": 0,
+  "vram_estimate": {
+    "bytes": 83886080,
+    "formatted": "80.0 MiB",
+    "packed_orm": true,
+    "include_mipmaps": true
+  },
+  "ai_insights": {
+    "classification": "wood",
+    "classification_confidence": 0.6,
+    "smart_suggestions": [
+      {
+        "category": "resolution",
+        "message": "Low visual complexity detected. Consider downscaling to 2K without noticeable quality loss.",
+        "confidence": 0.75,
+        "target_resolution": "2K"
+      }
+    ],
+    "anomalies": null
+  }
+}

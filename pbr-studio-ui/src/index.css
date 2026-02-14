@@ -1,0 +1,83 @@
+:root {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  /* Dark theme (default) */
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --panel-bg: #1e293b;
+  --header-bg: #0f172a;
+  --viewport-bg: #0f172a;
+  --border-color: #334155;
+  --input-bg: #0f172a;
+  --accent-color: #3b82f6;
+  --overlay-bg: rgba(15, 23, 42, 0.9);
+
+  /* Score colors (can be overridden by validation color customization) */
+  --score-good: #22c55e;
+  --score-medium: #eab308;
+  --score-low: #ef4444;
+
+  /* Issue severity colors */
+  --severity-error: #ef4444;
+  --severity-warning: #eab308;
+  --severity-info: #3b82f6;
+}
+
+/* Light theme */
+[data-theme="light"] {
+  --text-primary: #1e293b;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --panel-bg: #f1f5f9;
+  --header-bg: #e2e8f0;
+  --viewport-bg: #cbd5e1;
+  --border-color: #cbd5e1;
+  --input-bg: #ffffff;
+  --accent-color: #2563eb;
+  --overlay-bg: rgba(241, 245, 249, 0.95);
+}
+
+[data-theme="light"] button:hover {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+}
+
+[data-theme="light"] button:active {
+  background: #cbd5e1;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--panel-bg);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 0.875rem;
+  font-family: inherit;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+button:hover {
+  background: #334155;
+  border-color: #475569;
+}
+
+button:active {
+  background: #475569;
+}
