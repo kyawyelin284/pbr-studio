@@ -509,7 +509,7 @@ fn run_advanced_analysis_cmd(
     paths: Vec<String>,
     duplicate_threshold: Option<f32>,
     similar_threshold: Option<f32>,
-    tileability_threshold: Option<f32>,
+    _tileability_threshold: Option<f32>,
 ) -> Result<String, String> {
     if paths.is_empty() {
         return Err("No material paths provided".into());

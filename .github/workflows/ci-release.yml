@@ -115,6 +115,10 @@ jobs:
         working-directory: pbr-studio-ui
         run: npm ci
 
+      - name: Generate icons
+        working-directory: pbr-studio-ui
+        run: npm run tauri icon public/app-icon.png
+
       - name: Build AppImage
         working-directory: pbr-studio-ui
         run: npm run tauri build -- --bundles appimage --ci
@@ -146,6 +150,10 @@ jobs:
         working-directory: pbr-studio-ui
         run: npm ci
 
+      - name: Generate icons
+        working-directory: pbr-studio-ui
+        run: npm run tauri icon public/app-icon.png
+
       - name: Build MSI
         working-directory: pbr-studio-ui
         run: npm run tauri build -- --bundles msi --ci
@@ -176,6 +184,10 @@ jobs:
       - name: Install frontend deps
         working-directory: pbr-studio-ui
         run: npm ci
+
+      - name: Generate icons
+        working-directory: pbr-studio-ui
+        run: npm run tauri icon public/app-icon.png
 
       - name: Build DMG
         working-directory: pbr-studio-ui
