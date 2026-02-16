@@ -195,10 +195,7 @@ jobs:
       - build-linux-appimage
       - build-windows-msi
       - build-macos-dmg
-    if: |
-      github.event_name == 'push' &&
-      startsWith(github.ref, 'refs/tags/v') &&
-      secrets.ARTIFACT_STORAGE_URL != ''
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -248,6 +245,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: release-artifacts
+          merge-multiple: true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -261,5 +259,6 @@ jobs:
             release-artifacts/**/*.dmg
             release-artifacts/**/*.html
             release-artifacts/**/*.pdf
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
