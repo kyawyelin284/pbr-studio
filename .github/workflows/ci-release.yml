@@ -26,6 +26,9 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install Python Pillow
+        run: sudo apt-get update && sudo apt-get install -y python3-pillow
+
       - name: Create fixtures
         run: |
           mkdir -p ci/fixtures
@@ -49,8 +52,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install font for PDF
-        run: sudo apt-get update && sudo apt-get install -y fonts-liberation
+      - name: Install font and Pillow
+        run: sudo apt-get update && sudo apt-get install -y fonts-liberation python3-pillow
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable

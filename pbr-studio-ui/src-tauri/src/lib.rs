@@ -1,5 +1,5 @@
 use pbr_core::{
-    ai_analyze_json, batch_export_with_preset, export_audit_log_text, export_html_batch,
+    ai_analyze_json, batch_export_with_preset, export_html_batch,
     export_html_single, export_pdf_batch, export_pdf_single, export_with_lod, export_with_preset,
     export_with_target, fix_tileability_with_report, load_audit_log, record_analysis,
     record_optimization as audit_record_optimization, record_report as audit_record_report,
@@ -37,7 +37,7 @@ fn analyze_folder(path: String, plugins_dir: Option<String>) -> Result<String, S
     let set = MaterialSet::load_from_folder(&path).map_err(|e| e.to_string())?;
     let validator = get_validator(plugins_dir.as_deref());
     let issues = validator.check(&set);
-    let report = MaterialReport::from_material_set(&set, issues);
+    let report = MaterialReport::from_material_set(&set, issues.clone());
     let score = report.score;
     let passed = report.passed;
     let min_score = 70;
@@ -64,7 +64,7 @@ fn analyze_folders(paths: Vec<String>, plugins_dir: Option<String>) -> Result<Ve
         match MaterialSet::load_from_folder(&path) {
             Ok(set) => {
                 let issues = validator.check(&set);
-                let report = MaterialReport::from_material_set(&set, issues);
+                let report = MaterialReport::from_material_set(&set, issues.clone());
                 let min_score = 70;
                 let critical = issues.iter().filter(|i| i.severity == pbr_core::validation::Severity::Critical).count();
                 let major = issues.iter().filter(|i| i.severity == pbr_core::validation::Severity::Major).count();
@@ -224,7 +224,7 @@ fn batch_export_preset(
                     .or_else(|| folder.file_name().map(|n| n.to_string_lossy().into_owned()))
                     .unwrap_or_else(|| "material".to_string());
                 let material_dir = output_root.join(&name);
-                let prefix = material_dir.to_string_lossy();
+                let _prefix = material_dir.to_string_lossy();
                 let count = written.iter().filter(|p| p.starts_with(&material_dir)).count();
                 let _ = audit_record_optimization(
                     folder.as_path(),
@@ -521,7 +521,7 @@ fn run_advanced_analysis_cmd(
     }
     let dup = duplicate_threshold.unwrap_or(0.99);
     let sim = similar_threshold.unwrap_or(0.8);
-    let report = run_advanced_analysis(&materials, dup, sim, false)?;
+    let report = run_advanced_analysis(&materials, dup, sim, false).map_err(|e| e.to_string())?;
     let json = report.to_json().map_err(|e| e.to_string())?;
     Ok(json)
 }
@@ -595,32 +595,32 @@ fn get_texture_paths(path: String) -> Result<String, String> {
 
     if let Some(ref t) = set.albedo {
         if let Some(ref p) = t.path {
-            paths.insert("albedo".into(), p.to_string_lossy().into_owned());
+            paths.insert("albedo".into(), serde_json::Value::String(p.to_string_lossy().into_owned()));
         }
     }
     if let Some(ref t) = set.normal {
         if let Some(ref p) = t.path {
-            paths.insert("normal".into(), p.to_string_lossy().into_owned());
+            paths.insert("normal".into(), serde_json::Value::String(p.to_string_lossy().into_owned()));
         }
     }
     if let Some(ref t) = set.roughness {
         if let Some(ref p) = t.path {
-            paths.insert("roughness".into(), p.to_string_lossy().into_owned());
+            paths.insert("roughness".into(), serde_json::Value::String(p.to_string_lossy().into_owned()));
         }
     }
     if let Some(ref t) = set.metallic {
         if let Some(ref p) = t.path {
-            paths.insert("metallic".into(), p.to_string_lossy().into_owned());
+            paths.insert("metallic".into(), serde_json::Value::String(p.to_string_lossy().into_owned()));
         }
     }
     if let Some(ref t) = set.ao {
         if let Some(ref p) = t.path {
-            paths.insert("ao".into(), p.to_string_lossy().into_owned());
+            paths.insert("ao".into(), serde_json::Value::String(p.to_string_lossy().into_owned()));
         }
     }
     if let Some(ref t) = set.height {
         if let Some(ref p) = t.path {
-            paths.insert("height".into(), p.to_string_lossy().into_owned());
+            paths.insert("height".into(), serde_json::Value::String(p.to_string_lossy().into_owned()));
         }
     }
 
